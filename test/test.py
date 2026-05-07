@@ -1,40 +1,44 @@
-# SPDX-FileCopyrightText: © 2024 Tiny Tapeout
-# SPDX-License-Identifier: Apache-2.0
-
 import cocotb
 from cocotb.clock import Clock
 from cocotb.triggers import ClockCycles
 
-
 @cocotb.test()
-async def test_project(dut):
-    dut._log.info("Start")
+async def test_bytebeat(dut):
+    dut._log.info("Starting Bytebeat Synthesizer Test")
 
-    # Set the clock period to 10 us (100 KHz)
-    clock = Clock(dut.clk, 10, unit="us")
-    cocotb.start_soon(clock.start())
-
-    # Reset
-    dut._log.info("Reset")
-    dut.ena.value = 1
+    # Set initial input values to 0
     dut.ui_in.value = 0
     dut.uio_in.value = 0
+    dut.ena.value = 1
+    
+    # Start a 10 MHz Clock (100ns period)
+    clock = Clock(dut.clk, 100, units="ns")
+    cocotb.start_soon(clock.start())
+
+    # Apply Reset
+    dut._log.info("Resetting DUT")
     dut.rst_n.value = 0
     await ClockCycles(dut.clk, 10)
     dut.rst_n.value = 1
+    dut._log.info("Reset complete")
+    
+    # Test Pattern 0 (Original Mode)
+    dut._log.info("Testing Pattern 0")
+    dut.ui_in.value = 0b000_0_0000 # pat_sel=0, mask_en=0, shift=0
+    await ClockCycles(dut.clk, 100)
 
-    dut._log.info("Test project behavior")
+    # Test Pattern 1 (Classic Bytebeat with mask and shift)
+    dut._log.info("Testing Pattern 1")
+    # pat_sel=1 (001), mask_en=1, shift=2 (010) -> 001_1_0010
+    dut.ui_in.value = 0b001_1_0010 
+    await ClockCycles(dut.clk, 100)
 
-    # Set the input values you want to test
-    dut.ui_in.value = 20
-    dut.uio_in.value = 30
-
-    # Wait for one clock cycle to see the output values
-    await ClockCycles(dut.clk, 1)
-
-    # The following assersion is just an example of how to check the output values.
-    # Change it to match the actual expected output of your module:
-    assert dut.uo_out.value == 50
-
-    # Keep testing the module by changing the input values, waiting for
-    # one or more clock cycles, and asserting the expected output values.
+    # Test Pattern 5 (Square-wave mash)
+    dut._log.info("Testing Pattern 5")
+    # pat_sel=5 (101), mask_en=1, shift=4 (100) -> 101_1_0100
+    dut.ui_in.value = 0b101_1_0100 
+    
+    # Let the counter run to generate a good chunk of waveform data
+    await ClockCycles(dut.clk, 500)
+    
+    dut._log.info("All Bytebeat patterns simulated successfully!")
