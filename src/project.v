@@ -53,7 +53,7 @@ module tt_um_bytebeat (
 
     assign uo_out = pattern;
 
-    // Bidirectional pins as inputs
+    // Bidirectional pins
     assign uio_out = 8'b0;
     assign uio_oe  = 8'b0;
 
