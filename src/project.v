@@ -1,68 +1,177 @@
 `default_nettype none
 
-module tt_um_bytebeat (
-    input  wire [7:0] ui_in,    // ui_in[2:0] shift, [3] mask enable, [7:5] pattern select
-    output wire [7:0] uo_out,
-    input  wire [7:0] uio_in,
-    output wire [7:0] uio_out,
-    output wire [7:0] uio_oe,
-    input  wire       ena,
-    input  wire       clk,
-    input  wire       rst_n
+module tt_um_demoscenettsky (
+    input  wire [7:0] ui_in, // 8-bit input, [2:0] shift, [3] mask , 7[:5] pattern select3
+    output wire [7:0] uo_out, // 8 -bit output bus, [5:0] RGB(RRGGBB), [6] hsync, [7] vsync
+    input  wire [7:0] uio_in, // bidirectional I/O input (unused)
+    output wire [7:0] uio_out, //bidirectional I/O Output, 8bit audio
+    output wire [7:0] uio_oe, //bidirectional I/O enable 0xFF(255) during blanking, else 0
+    input  wire       ena, // always 1 when on
+    input  wire       clk, // 25MHz
+    input  wire       rst_n // Active-low reset
 );
 
-    reg [15:0] t;
-    reg [7:0]  pattern;   // output buffer (for combinational logic clarity)
+// VGA Timing
+	reg [9:0] x; // Horizontal pixel counter 0 - 799
+	reg [9:0] y;  // Vertical pixel counter 0 - 524
+	
+	wire hsync = (x >= 10'd656 && x < 10'd752) ? 1'b0 : 1'b1; // active low
+	wire vsync = (y >= 10'd490 && y < 10'd492) ? 1'b0 : 1'b1; // active low
+	wire active = (x < 10'd640 && y < 10'd480); // visible screen
+	
+	always @(posedge clk) begin
+		if (!rst_n) begin
+			x <= 10'd0;
+			y <= 10'd0;
+		end else begin
+			if (x == 10'd799) begin
+				x <= 10'd0;
+				if (y == 10'd524)
+					y <= 10'd0;
+				else
+					y <= y + 1'b1;
+			end else begin
+				x <= x + 1'b1;
+			end
+		end
+	end
+	
+	
+	// Frame counter
+	reg [15:0] t_frame;
+	wire vsync_rising = (x == 10'd799 && y == 10'd524);
+	
+	always @(posedge clk) begin
+		if (!rst_n)
+			t_frame <= 16'd0;
+		else if (vsync_rising)
+			t_frame <= t_frame + 1'b1;
+	end
+	
+	// LFSR
+	
+	reg [15:0] lfsr;
+	always @(posedge clk) begin
+		if (!rst_n)
+			lfsr <= 16'hACE1;
+		else
+			lfsr <= {lfsr[14:0], ~(lfsr[15] ^ lfsr[13] ^ lfsr[12] ^ lfsr[10])};
+	end
+	
+	// Controller 
+	reg [5:0] frame_count;
+	reg [15:0] config;
+	
+	always @(posedge clk) begin
+		if (!rst_n) begin
+			frame_count <= 6'd0;
+			config <= 16'h0000;
+		end else if (vsync_rising) begin
+			if (frame_count == 6'd59) begin
+				frame_count <= 6'd0;
+				config <= lfsr;
+			end else begin
+				frame_count <= frame_count + 1'b1;
+			end
+		end
+	end
+	
+	//Decode cOnfig
+	wire [2:0] mode = config[2:0];
+	wire [2:0] shift_amt = config[5:3];
+	wire [1:0] palette_sel = config[7:6];
+	wire [2:0] audio_shift = config[10:8];
+	wire audio_mask = config[11];
 
-    // Common control fields
-    wire [2:0] shift_amt = ui_in[2:0];
-    wire       mask_en   = ui_in[3];
-    wire [2:0] pat_sel   = ui_in[7:5];
-
-    // Mask for low byte
-    wire [7:0] mask = {8{mask_en}};
-
-    // Pattern generation – selected by pat_sel
-    always @* begin
-        case (pat_sel)
-            // 0: Original mode – shift + XOR masked low byte
-            3'd0: pattern = (t[15:8] >> shift_amt) ^ (t[7:0] & mask);
-
-            // 1: Classic bytebeat “t * (t>>8)” with shift control
-            3'd1: pattern = t[7:0] + ((t[15:8] >> shift_amt) & mask) ^ (t[15:8] << 1);
-
-            // 2: Metallic bell – (t * (t>>8)) XOR (t>>(shift+4))
-            3'd2: pattern = (t[7:0] * (t[15:8] >> shift_amt)) ^ (t[15:8] >> (shift_amt+1));
-
-            // 3: Sierpinski-like fractal – t & (t>>8) XOR t>>shift
-            3'd3: pattern = (t[7:0] & (t[15:8] >> shift_amt)) ^ (t[15:8] >> (shift_amt+2));
-
-            // 4: Hollow drone – alternating hi/lo slices
-            3'd4: pattern = (t[15:8] >> shift_amt) | (t[7:0] & mask);
-
-            // 5: Square‑wave mash – multiple XORS with shifted copies
-            3'd5: pattern = (t[15:8] ^ (t[15:8] >> shift_amt)) + (t[7:0] & mask);
-
-            // 6: Reverse saw – subtract shifted high byte from low byte
-            3'd6: pattern = t[7:0] - (t[15:8] >> shift_amt);
-
-            // 7: Chaotic mixer – triple XOR
-            default: pattern = t[15:8] ^ (t[7:0] >> shift_amt) ^ (t[15:8] << 3) ^ (t[7:0] & mask);
+	//Render pipeline
+	reg [7:0] pixel;
+	
+	wire [9:0] X = x;
+	wire [9:0] Y = y;
+	wire [7:0] s = {5'd0, shift_amt};
+	
+	always @* begin
+		case (mode)
+        	3'd0: pixel = (X ^ Y) & (X >> shift_amt) & (Y >> shift_amt);
+            3'd1: pixel = (X ^ Y ^ (Y>>1) ^ (X<<1)) + t_frame[7:0];
+            3'd2: pixel = (((X<<1) + X + Y) >> 1) ^ (((X + (Y<<1) + Y) >> 2) + t_frame[7:0]);
+            3'd3: pixel = (X>>1) - (Y>>1) ^ (X | Y) + t_frame[7:0];
+            3'd4: pixel = (X & Y) - (X | Y) ^ t_frame[7:0];
+            3'd5: pixel = (X<<1) ^ (Y<<1) ^ ((X+Y) >> shift_amt);
+            3'd6: pixel = (X * Y) & 8'hFF;      // pastel swirls
+            3'd7: pixel = X ^ Y ^ (X >> (Y % 5)) ^ (Y >> (X % 5)) ^ t_frame[7:0];
+            default: pixel = 8'd0;
         endcase
     end
-
-    assign uo_out = pattern;
-
-    // Bidirectional pins
-    assign uio_out = 8'b0;
-    assign uio_oe  = 8'b0;
-
-    // 16‑bit counter
+    
+    
+    // Pallette mapper
+    reg [5:0] rgb;
+    always @* begin
+        case (palette_sel)
+            2'b00: rgb = {pixel[7:6], pixel[5:4], pixel[3:2]};        // natural
+            2'b01: rgb = {pixel[7:6], pixel[3:2], pixel[5:4]};        // channel swap
+            2'b10: rgb = {pixel[7:5], 1'b0, pixel[4:3]};              // muted
+            2'b11: rgb = ~{pixel[7:5], pixel[4:2]};                   // inverted
+        endcase
+    end
+	
+	// VGA Output
+	assign uo_out = active ? {vsync, hsync, rgb} : 8'h00;
+	
+	// Audio engine
+    reg [15:0] audio_t;
     always @(posedge clk) begin
         if (!rst_n)
-            t <= 16'd0;
+            audio_t <= 16'd0;
         else
-            t <= t + 1'd1;
+            audio_t <= audio_t + 1'b1;
     end
 
-endmodule
+    wire [7:0] audio_sample;
+    assign audio_sample = (audio_t[15:8] >> audio_shift) ^ (audio_t[7:0] & {8{audio_mask}});	
+    
+    
+    // Bidirectional Pins
+    assign uio_out = (active == 1'b0) ? audio_sample : 8'b0;
+    assign uio_oe  = (active == 1'b0) ? 8'hFF : 8'h00;
+    // During active video, the bidir pins are inputs (high impedance),
+    // so they don't interfere with any external circuits.
+
+endmodule	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+			
