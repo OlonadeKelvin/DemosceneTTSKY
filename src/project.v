@@ -36,6 +36,13 @@ module tt_um_demoscenettsky (
 		end
 	end
 	
+	// vsync edge detection
+	reg vsync_d;
+	wire vsync_edge = (vsync_d == 1'b1 && vsync == 1'b0);
+	
+	always @(posedge clk) begin
+		vsync_d <= vsync;
+	end
 	
 	// Frame counter
 	reg [15:0] t_frame;
@@ -139,18 +146,6 @@ module tt_um_demoscenettsky (
     // so they don't interfere with any external circuits.
 
 endmodule	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
 	
 	
 	
