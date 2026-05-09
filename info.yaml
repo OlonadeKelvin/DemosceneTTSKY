@@ -1,50 +1,48 @@
-# Tiny Tapeout project information
 project:
   title:        "Algorithmic Pattern Generator"
   author:       "Olonade Kelvin"
   discord:      "Olonade Kelvin"
-  description:  "A hardware-based Bytebeat generative pattern engine."
-  how_it_works: "A 16-bit counter (t) is processed through 8 selectable bitwise mathematical algorithms."
-  how_to_test:  "Set ui[7:5] to select pattern, ui[2:0] for shift amount, and ui[3] for masking. Observe uo pattern."
+  description:  "A fully autonomous VGA visual synthesizer with audio, driven by pure logic gates and LFSR."
+  how_it_works: "VGA timing generator creates 640x480@60Hz. Render engine computes pixel colors from (x,y,t) using 8 hardwired bitwise equations. An LFSR autonomously changes patterns, shift amounts, and color palettes every second. Audio bytebeat is output during blanking intervals."
+  how_to_test:  "Apply 25 MHz clock, reset briefly. Connect uo[7:6] to VGA sync, uo[5:0] to resistor DAC for RGB. Connect uio[7:0] to audio DAC/amplifier. Image appears on VGA monitor and sounds morph over time."
   language:     "Verilog"
-  clock_hz:     10000000       # 10 MHz
+  clock_hz:     25000000       # 25 MHz for 640x480 VGA
   tiles:        "1x1"          
-  top_module:   "tt_um_bytebeat" 
-
+  top_module:   "tt_um_demoscenettsky" 
   source_files:
     - "project.v"
 
-# The pinout of your project. 
+# Pin assignments for the Platinum VGA + Audio design
 pinout:
-  # Inputs
-  ui[0]: "Shift Bit 0"
-  ui[1]: "Shift Bit 1"
-  ui[2]: "Shift Bit 2"
-  ui[3]: "Mask Enable"
+  # Inputs (not actively used by autonomous mode, available for override)
+  ui[0]: "Manual override (unused)"
+  ui[1]: "Manual override (unused)"
+  ui[2]: "Manual override (unused)"
+  ui[3]: "Manual override (unused)"
   ui[4]: "Unused"
-  ui[5]: "Pattern Sel 0"
-  ui[6]: "Pattern Sel 1"
-  ui[7]: "Pattern Sel 2"
+  ui[5]: "Unused"
+  ui[6]: "Unused"
+  ui[7]: "Unused"
 
-  # Outputs
-  uo[0]: "Bit 0 Out"
-  uo[1]: "Bit 1 Out"
-  uo[2]: "Bit 2 Out"
-  uo[3]: "Bit 3 Out"
-  uo[4]: "Bit 4 Out"
-  uo[5]: "Bit 5 Out"
-  uo[6]: "Bit 6 Out"
-  uo[7]: "Bit 7 Out"
+  # Outputs (dedicated VGA + sync)
+  uo[0]: "Red LSB"
+  uo[1]: "Red MSB"
+  uo[2]: "Green LSB"
+  uo[3]: "Green MSB"
+  uo[4]: "Blue LSB"
+  uo[5]: "Blue MSB"
+  uo[6]: "Hsync"
+  uo[7]: "Vsync"
 
-  # Bidirectional pins
-  uio[0]: "Unused"
-  uio[1]: "Unused"
-  uio[2]: "Unused"
-  uio[3]: "Unused"
-  uio[4]: "Unused"
-  uio[5]: "Unused"
-  uio[6]: "Unused"
-  uio[7]: "Unused"
+  # Bidirectional pins (audio during blanking)
+  uio[0]: "Audio bit 0"
+  uio[1]: "Audio bit 1"
+  uio[2]: "Audio bit 2"
+  uio[3]: "Audio bit 3"
+  uio[4]: "Audio bit 4"
+  uio[5]: "Audio bit 5"
+  uio[6]: "Audio bit 6"
+  uio[7]: "Audio bit 7"
 
 # Do not change!
 yaml_version: 6
