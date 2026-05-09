@@ -27,16 +27,16 @@ Instead of storing an image, we **evaluate a mathematical function `f(x, y, t)`*
 
 #### Our 8 Visual Equations:
 
-| Mode | Equation (simplified)                        | Visual Style                     |
-|------|----------------------------------------------|----------------------------------|
-| 0    | `(x ^ y) & (x >> s) & (y >> s)`              | Sierpinski fractal weave         |
-| 1    | `(x ^ y ^ (y>>1) ^ (x<<1)) + t`              | Organic plasma clouds            |
-| 2    | `((x*3+y)>>1) ^ ((x+y*3)>>2) + t`            | Rotating moiré tunnels           |
-| 3    | `(x>>1) - (y>>1) ^ (x|y) + t`                | Pulsating cellular ripples       |
-| 4    | `(x & y) - (x | y) ^ t`                      | Concentric interference rings    |
-| 5    | `(x<<1) ^ (y<<1) ^ ((x+y) >> s)`             | Sharp metallic landscapes        |
-| 6    | `(x*y) & 0xFF` (shift-add multiplier)        | Soft pastel fractal swirls       |
-| 7    | `x ^ y ^ (x>>(y%8)) ^ (y>>(x%8)) ^ t`        | Chaotic glitch art               |
+| Mode | Equation (simplified) | Visual Style |
+| :--- | :--- | :--- |
+| 0 | `(x ^ y) & (x >> s) & (y >> s)` | Sierpinski fractal weave |
+| 1 | `(x ^ y ^ (y>>1) ^ (x<<1)) + t` | Organic plasma clouds |
+| 2 | `((x*3+y)>>1) ^ ((x+y*3)>>2) + t` | Rotating moiré tunnels |
+| 3 | `(x>>1) - (y>>1) ^ (x \| y) + t` | Pulsating cellular ripples |
+| 4 | `(x & y) - (x \| y) ^ t` | Concentric interference rings |
+| 5 | `(x<<1) ^ (y<<1) ^ ((x+y) >> s)` | Sharp metallic landscapes |
+| 6 | `(x*y) & 0xFF` (shift-add multiplier) | Soft pastel fractal swirls |
+| 7 | `x ^ y ^ (x>>(y%8)) ^ (y>>(x%8)) ^ t` | Chaotic glitch art |
 
 > `s` is a shift amount (0–7), `t` is a frame counter that increments every vsync (60 Hz).  
 > All operations are 10‑bit intermediate; final result is truncated to 8‑bit luminance/colour index.
@@ -56,46 +56,3 @@ The 8‑bit computed pixel value is mapped to 6‑bit colour (RRGGBB) via a pale
 
 ### 5. Audio (Bonus)
 During the blanking periods (when no pixel is being drawn), the same arithmetic engine that once drove the Base Edition Bytebeat kicks in. An extra pin outputs an 8‑bit audio waveform, derived from a free‑running counter, producing retro chiptune melodies. The transition is seamless and adds a powerful sensory layer.
-
-## Architecture Diagram
-+-------------------+      +-------------------+
-|  VGA Timing       |      |  Frame Counter    |
-|  Generator        |      |  (t_frame)        |
-|                   |      +---------+---------+
-|  outputs:         |                |
-|  - hsync, vsync   |                |
-|  - pixel x, y     +--------+-------+
-+---------+---------+        |
-          |                  |
-          | x, y             | t_frame
-          v                  v
-      +-----------------------------+
-      |       Render Pipeline       |
-      |   (Equation Multicore)     |
-      |   +-----------------------+|
-      |   | 8 equations based on  ||
-      |   | (x, y, t, shift)     ||
-      |   +----------+------------+|
-      +-----------------------------+
-                     |
-                     | 8-bit pixel value
-                     v
-                +----------+
-         +---->|  Palette  |
-         |     |  Mapper   |
-         |     +-----+-----+
-         |           |
-         |           | 6-bit RGB
-         |           v
-         |     +----------+
-         |     | Resistor |     VGA Monitor
-         |     | DAC      +---------------->
-         |     +----------+
-         |
-         |  mode, shift, palette select
-         +------+-------+
-                |       |
-           +----+---++--+----+
-           |   LFSR Show     |
-           |   Controller    |
-           +-----------------+
