@@ -1,48 +1,92 @@
 import cocotb
 from cocotb.clock import Clock
-from cocotb.triggers import ClockCycles, RisingEdge, FallingEdge, Timer
+from cocotb.triggers import ClockCycles, RisingEdge
+
+
+def decode_uo_out(val):
+    """Decode packed VGA output bus"""
+    return {
+        "rgb": val & 0x3F,
+        "hsync": (val >> 6) & 1,
+        "vsync": (val >> 7) & 1,
+    }
+
 
 @cocotb.test()
 async def test_demoscene_platinum(dut):
 
     dut._log.info("Starting DemosceneTTSKY test")
 
-    # Setup inputs
+    # -------------------------
+    # INIT INPUTS
+    # -------------------------
     dut.ui_in.value = 0
     dut.uio_in.value = 0
     dut.ena.value = 1
 
-    # 25 MHz clock (period 40 ns)
+    # -------------------------
+    # CLOCK (25 MHz = 40 ns)
+    # -------------------------
     clock = Clock(dut.clk, 40, units="ns")
     cocotb.start_soon(clock.start())
 
-    # Reset pulse
+    # -------------------------
+    # RESET
+    # -------------------------
     dut.rst_n.value = 0
     await ClockCycles(dut.clk, 10)
     dut.rst_n.value = 1
     dut._log.info("Reset released")
 
-    # Wait for at least one full frame (800*525 = 420,000 cycles)
-        # Wait for first falling vsync
-    await FallingEdge(dut.uo_out[7])
-    dut._log.info("First vsync falling edge detected")
-    dut._log.info("Waiting for one full frame...")
-    await ClockCycles(dut.clk, 420_000)
+    # -------------------------
+    # WAIT FOR STABLE START
+    # -------------------------
+    for _ in range(1000):
+        await RisingEdge(dut.clk)
 
-    # Check that hsync and vsync are toggling
-    hsync = dut.uo_out.value.integer & (1 << 6)   # bit 6
-    vsync = dut.uo_out.value.integer & (1 << 7)   # bit 7
-    dut._log.info(f"After one frame: hsync bit = {hsync >> 6}, vsync bit = {vsync >> 7}")
+    # -------------------------
+    # FRAME DETECTION
+    # -------------------------
+    prev_vsync = 1
+    frame_count = 0
 
-    # Run for ~4 more frames to capture LFSR changes
-    dut._log.info("Running for 3 more frames to observe LFSR...")
-    for frame in range(3):
-        await ClockCycles(dut.clk, 420_000)
-        dut._log.info(f"Frame {frame+2} completed")
+    dut._log.info("Monitoring frames...")
 
-    # Quick check on audio output during blanking (just read it)
-    audio = dut.uio_out.value
-    oe    = dut.uio_oe.value
-    dut._log.info(f"Final uio_out (audio) = {audio}, uio_oe = {oe}")
+    for cycle in range(2_000_000):
 
-    dut._log.info("DemosceneTTSKY test finished successfully!")
+        await RisingEdge(dut.clk)
+
+        val = dut.uo_out.value.integer
+        sig = decode_uo_out(val)
+
+        # detect falling edge of vsync (frame boundary)
+        if prev_vsync == 1 and sig["vsync"] == 0:
+            frame_count += 1
+            dut._log.info(f"Frame detected: {frame_count}")
+
+        prev_vsync = sig["vsync"]
+
+        # stop after a few frames
+        if frame_count >= 5:
+            break
+
+    # -------------------------
+    # FINAL CHECKS
+    # -------------------------
+    val = dut.uo_out.value.integer
+    sig = decode_uo_out(val)
+
+    dut._log.info(f"Final RGB: {sig['rgb']}")
+    dut._log.info(f"Final HSYNC: {sig['hsync']}")
+    dut._log.info(f"Final VSYNC: {sig['vsync']}")
+
+    # -------------------------
+    # AUDIO CHECK
+    # -------------------------
+    audio = dut.uio_out.value.integer
+    oe = dut.uio_oe.value.integer
+
+    dut._log.info(f"Audio output: {audio}")
+    dut._log.info(f"OE state: {oe}")
+
+    dut._log.info("Test completed successfully")

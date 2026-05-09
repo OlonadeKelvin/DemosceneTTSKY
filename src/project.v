@@ -36,6 +36,13 @@ module tt_um_demoscenettsky (
 		end
 	end
 	
+	// vsync edge detection
+	reg vsync_d;
+	wire vsync_edge = (vsync_d == 1'b1 && vsync == 1'b0);
+	
+	always @(posedge clk) begin
+		vsync_d <= vsync;
+	end
 	
 	// Frame counter
 	reg [15:0] t_frame;
@@ -60,28 +67,28 @@ module tt_um_demoscenettsky (
 	
 	// Controller 
 	reg [5:0] frame_count;
-	reg [15:0] config;
+	reg [15:0] confi;
 	
 	always @(posedge clk) begin
 		if (!rst_n) begin
 			frame_count <= 6'd0;
-			config <= 16'h0000;
+			confi <= 16'h0000;
 		end else if (vsync_rising) begin
 			if (frame_count == 6'd59) begin
 				frame_count <= 6'd0;
-				config <= lfsr;
+				confi <= lfsr;
 			end else begin
 				frame_count <= frame_count + 1'b1;
 			end
 		end
 	end
 	
-	//Decode cOnfig
-	wire [2:0] mode = config[2:0];
-	wire [2:0] shift_amt = config[5:3];
-	wire [1:0] palette_sel = config[7:6];
-	wire [2:0] audio_shift = config[10:8];
-	wire audio_mask = config[11];
+	//Decode cOnfi
+	wire [2:0] mode = confi[2:0];
+	wire [2:0] shift_amt = confi[5:3];
+	wire [1:0] palette_sel = confi[7:6];
+	wire [2:0] audio_shift = confi[10:8];
+	wire audio_mask = confi[11];
 
 	//Render pipeline
 	reg [7:0] pixel;
@@ -139,18 +146,6 @@ module tt_um_demoscenettsky (
     // so they don't interfere with any external circuits.
 
 endmodule	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
 	
 	
 	
