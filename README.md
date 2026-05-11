@@ -54,5 +54,17 @@ The 8‑bit computed pixel value is mapped to 6‑bit colour (RRGGBB) via a pale
 - Simple resistor DAC on the dedicated output pins provides a beautiful analogue VGA signal.
 - Possible palettes: natural, channel‑swapped, muted, inverted.
 
-### 5. Audio (Bonus)
+### 5. Audio 
 During the blanking periods (when no pixel is being drawn), the same arithmetic engine that once drove the Base Edition Bytebeat kicks in. An extra pin outputs an 8‑bit audio waveform, derived from a free‑running counter, producing retro chiptune melodies. The transition is seamless and adds a powerful sensory layer.
+
+### 6. Manual Override Feature
+The system supports a manual override mode using ui_in:
+- ui_in[4] = 1 enable manual mode control
+- ui_in[7:5] select visual mode (0–7)
+- ui_in[4] = 0 fully autonomous LFSR-driven mode
+
+This allows:
+live debugging of patterns
+deterministic visual selection
+interactive demo control
+

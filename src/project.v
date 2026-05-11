@@ -20,20 +20,24 @@ module tt_um_demoscenettsky (
 	wire active = (x < 10'd640 && y < 10'd480); // visible screen
 	
 	always @(posedge clk) begin
-		if (!rst_n) begin
-			x <= 10'd0;
-			y <= 10'd0;
-		end else begin
-			if (x == 10'd799) begin
-				x <= 10'd0;
-				if (y == 10'd524)
-					y <= 10'd0;
-				else
-					y <= y + 1'b1;
-			end else begin
-				x <= x + 1'b1;
-			end
-		end
+    	if (!rst_n) begin
+        	x <= 10'd0;
+        	y <= 10'd0;
+
+    	end else if (ena) begin
+
+        	if (x == 10'd799) begin
+            	x <= 10'd0;
+
+            	if (y == 10'd524)
+                	y <= 10'd0;
+            	else
+                	y <= y + 1'b1;
+
+        	end else begin
+            	x <= x + 1'b1;
+        	end
+    	end
 	end
 	
 	// vsync edge detection
@@ -41,28 +45,31 @@ module tt_um_demoscenettsky (
 	wire vsync_edge = (vsync_d == 1'b1 && vsync == 1'b0);
 	
 	always @(posedge clk) begin
-		vsync_d <= vsync;
+		if (!rst_n)
+			vsync_d <= 1'b1;
+		else if (ena)
+			vsync_d <= vsync;
 	end
 	
 	// Frame counter
 	reg [15:0] t_frame;
-	wire vsync_rising = (x == 10'd799 && y == 10'd524);
 	
 	always @(posedge clk) begin
 		if (!rst_n)
 			t_frame <= 16'd0;
-		else if (vsync_rising)
+		else if (ena && vsync_edge)
 			t_frame <= t_frame + 1'b1;
 	end
 	
 	// LFSR
 	
 	reg [15:0] lfsr;
+	
 	always @(posedge clk) begin
-		if (!rst_n)
-			lfsr <= 16'hACE1;
-		else
-			lfsr <= {lfsr[14:0], ~(lfsr[15] ^ lfsr[13] ^ lfsr[12] ^ lfsr[10])};
+    	if (!rst_n)
+       		lfsr <= 16'hACE1;
+    	else if (ena && vsync_edge)
+        	lfsr <= {lfsr[14:0], ~(lfsr[15] ^ lfsr[13] ^ lfsr[12] ^ lfsr[10])};
 	end
 	
 	// Controller 
@@ -72,8 +79,8 @@ module tt_um_demoscenettsky (
 	always @(posedge clk) begin
 		if (!rst_n) begin
 			frame_count <= 6'd0;
-			confi <= 16'h0000;
-		end else if (vsync_rising) begin
+			confi <= 16'hACE1; // Random parameters
+		end else if (ena && vsync_edge) begin
 			if (frame_count == 6'd59) begin
 				frame_count <= 6'd0;
 				confi <= lfsr;
@@ -84,8 +91,9 @@ module tt_um_demoscenettsky (
 	end
 	
 	//Decode cOnfi
-	wire [2:0] mode = confi[2:0];
-	wire [2:0] shift_amt = confi[5:3];
+	wire [2:0] ui_mode = ui_in[7:5];
+	wire [2:0] mode = ui_in[4] ? ui_mode : confi[2:0];
+	wire [2:0] shift_amt =ui_in[3] ? ui_in[2:0] : confi[5:3];
 	wire [1:0] palette_sel = confi[7:6];
 	wire [2:0] audio_shift = confi[10:8];
 	wire audio_mask = confi[11];
@@ -95,24 +103,29 @@ module tt_um_demoscenettsky (
 	
 	wire [9:0] X = x;
 	wire [9:0] Y = y;
-	wire [7:0] s = {5'd0, shift_amt};
+	//wire [7:0] s = {5'd0, shift_amt};
+	wire [2:0] safe_shift = shift_amt & 3'b111;
+	wire [2:0] x_shift = X[2:0];
+	wire [2:0] y_shift = Y[2:0];
 	
 	always @* begin
 		case (mode)
-        	3'd0: pixel = (X ^ Y) & (X >> shift_amt) & (Y >> shift_amt);
+        	3'd0: pixel = (X ^ Y) & (X >> safe_shift) & (Y >> safe_shift);
             3'd1: pixel = (X ^ Y ^ (Y>>1) ^ (X<<1)) + t_frame[7:0];
             3'd2: pixel = (((X<<1) + X + Y) >> 1) ^ (((X + (Y<<1) + Y) >> 2) + t_frame[7:0]);
             3'd3: pixel = (X>>1) - (Y>>1) ^ (X | Y) + t_frame[7:0];
             3'd4: pixel = (X & Y) - (X | Y) ^ t_frame[7:0];
-            3'd5: pixel = (X<<1) ^ (Y<<1) ^ ((X+Y) >> shift_amt);
-            3'd6: pixel = (X * Y) & 8'hFF;      // pastel swirls
-            3'd7: pixel = X ^ Y ^ (X >> (Y % 5)) ^ (Y >> (X % 5)) ^ t_frame[7:0];
+            3'd5: pixel = (X<<1) ^ (Y<<1) ^ ((X+Y) >> safe_shift);
+            //3'd6: pixel = (X * Y) & 8'hFF;      // pastel swirls
+			3'd6: pixel = ((X << 2) ^ (Y << 1) ^ (X + Y)); // Using shift add approximation            
+            3'd7: pixel = X ^ Y ^ ((X >> y_shift)) ^ ((Y >> x_shift)) ^ t_frame[7:0];
+            
             default: pixel = 8'd0;
         endcase
     end
     
     
-    // Pallette mapper
+    // Palette mapper
     reg [5:0] rgb;
     always @* begin
         case (palette_sel)
@@ -124,14 +137,14 @@ module tt_um_demoscenettsky (
     end
 	
 	// VGA Output
-	assign uo_out = active ? {vsync, hsync, rgb} : 8'h00;
+	assign uo_out = active ? {vsync, hsync, rgb} : {vsync, hsync, 6'h00};
 	
 	// Audio engine
     reg [15:0] audio_t;
     always @(posedge clk) begin
         if (!rst_n)
             audio_t <= 16'd0;
-        else
+        else if (ena)
             audio_t <= audio_t + 1'b1;
     end
 
@@ -145,28 +158,4 @@ module tt_um_demoscenettsky (
     // During active video, the bidir pins are inputs (high impedance),
     // so they don't interfere with any external circuits.
 
-endmodule	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-			
+endmodule
