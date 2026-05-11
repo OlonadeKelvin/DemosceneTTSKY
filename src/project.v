@@ -124,7 +124,7 @@ module tt_um_demoscenettsky (
     end
 	
 	// VGA Output
-	assign uo_out = active ? {vsync, hsync, rgb} : 8'h00;
+	assign uo_out = active ? {vsync, hsync, rgb} : {vsync, hsync, 6'h00};
 	
 	// Audio engine
     reg [15:0] audio_t;
