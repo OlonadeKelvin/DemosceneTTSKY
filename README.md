@@ -50,7 +50,7 @@ Instead of storing an image, we **evaluate a mathematical function `f(x, y, t)`*
 - This creates a **non‑repeating, self‑directed visual performance** – the chip is its own VJ.
 
 ### 4. Colour Output (6-bit RGB)
-The 8‑bit computed pixel value is mapped to 6‑bit colour (RRGGBB) via a palette lookup, which is dynamically switched by the LFSR.
+The 8‑bit computed pixel value is mapped to 6‑bit colour via a palette lookup, which is dynamically switched by the LFSR.
 - Simple resistor DAC on the dedicated output pins provides a beautiful analogue VGA signal.
 - Possible palettes: natural, channel‑swapped, muted, inverted.
 

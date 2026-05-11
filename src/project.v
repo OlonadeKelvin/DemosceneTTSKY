@@ -94,7 +94,7 @@ module tt_um_demoscenettsky (
 	wire [2:0] ui_mode = ui_in[7:5];
 	wire [2:0] mode = ui_in[4] ? ui_mode : confi[2:0];
 	wire [2:0] shift_amt =ui_in[3] ? ui_in[2:0] : confi[5:3];
-	wire [1:0] palette_sel = confi[7:6];
+	//wire [1:0] palette_sel = confi[7:6];
 	wire [2:0] audio_shift = confi[10:8];
 	wire audio_mask = confi[11];
 
@@ -124,20 +124,22 @@ module tt_um_demoscenettsky (
         endcase
     end
     
-    
-    // Palette mapper
-    reg [5:0] rgb;
-    always @* begin
-        case (palette_sel)
-            2'b00: rgb = {pixel[7:6], pixel[5:4], pixel[3:2]};        // natural
-            2'b01: rgb = {pixel[7:6], pixel[3:2], pixel[5:4]};        // channel swap
-            2'b10: rgb = {pixel[7:5], 1'b0, pixel[4:3]};              // muted
-            2'b11: rgb = ~{pixel[7:5], pixel[4:2]};                   // inverted
-        endcase
-    end
 	
-	// VGA Output
-	assign uo_out = active ? {vsync, hsync, rgb} : {vsync, hsync, 6'h00};
+	// VGA Output - TinyVGA Pinout
+	wire [1:0] r = pixel[7:6];  // Red
+	wire [1:0] g = pixel[5:4];  // Green
+	wire [1:0] b = pixel[3:2];  // Blue
+
+	assign uo_out = {
+		hsync,                    // uo[7]
+		active ? b[0] : 1'b0,     // uo[6]  B0
+		active ? g[0] : 1'b0,     // uo[5]  G0
+		active ? r[0] : 1'b0,     // uo[4]  R0
+		vsync,                    // uo[3]
+		active ? b[1] : 1'b0,     // uo[2]  B1
+		active ? g[1] : 1'b0,     // uo[1]  G1
+		active ? r[1] : 1'b0      // uo[0]  R1
+	};
 	
 	// Audio engine
     reg [15:0] audio_t;
