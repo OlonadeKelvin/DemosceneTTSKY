@@ -91,7 +91,8 @@ module tt_um_demoscenettsky (
 	end
 	
 	//Decode cOnfi
-	wire [2:0] mode = confi[2:0];
+	wire [2:0] ui_mode = ui_in[7:5];
+	wire [2:0] mode = ui_in[4] ? ui_mode : confi[2:0];
 	wire [2:0] shift_amt =ui_in[3] ? ui_in[2:0] : confi[5:3];
 	wire [1:0] palette_sel = confi[7:6];
 	wire [2:0] audio_shift = confi[10:8];
@@ -104,6 +105,8 @@ module tt_um_demoscenettsky (
 	wire [9:0] Y = y;
 	//wire [7:0] s = {5'd0, shift_amt};
 	wire [2:0] safe_shift = shift_amt & 3'b111;
+	wire [2:0] x_shift = X[2:0];
+	wire [2:0] y_shift = Y[2:0];
 	
 	always @* begin
 		case (mode)
@@ -115,7 +118,7 @@ module tt_um_demoscenettsky (
             3'd5: pixel = (X<<1) ^ (Y<<1) ^ ((X+Y) >> safe_shift);
             //3'd6: pixel = (X * Y) & 8'hFF;      // pastel swirls
 			3'd6: pixel = ((X << 2) ^ (Y << 1) ^ (X + Y)); // Using shift add approximation            
-            3'd7: pixel = X ^ Y ^ ((X >> Y[2:0])) ^ ((Y >> X[2:0])) ^ t_frame[7:0];
+            3'd7: pixel = X ^ Y ^ ((X >> y_shift)) ^ ((Y >> x_shift)) ^ t_frame[7:0];
             
             default: pixel = 8'd0;
         endcase

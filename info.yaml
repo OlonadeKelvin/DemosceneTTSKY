@@ -15,14 +15,14 @@ project:
 # Pin assignments for the Platinum VGA + Audio design
 pinout:
   # Inputs (not actively used by autonomous mode, available for override)
-  ui[0]: "Manual override (unused)"
-  ui[1]: "Manual override (unused)"
-  ui[2]: "Manual override (unused)"
-  ui[3]: "Manual override (unused)"
-  ui[4]: "Unused"
-  ui[5]: "Unused"
-  ui[6]: "Unused"
-  ui[7]: "Unused"
+  ui[0]: "Manual shift override (ui[3]) + shift bits (ui[2:0])"
+  ui[1]: "Manual shift override (ui[3]) + shift bits (ui[2:0])"
+  ui[2]: "Manual shift override (ui[3]) + shift bits (ui[2:0])"
+  ui[3]: "Manual shift override (ui[3]) + shift bits (ui[2:0])"
+  ui[4]: "Mode override enable"
+  ui[5]: "Manual mode selection (0–7) when ui[4]=1"
+  ui[6]: "Manual mode selection (0–7) when ui[4]=1"
+  ui[7]: "Manual mode selection (0–7) when ui[4]=1"
 
   # Outputs (dedicated VGA + sync)
   uo[0]: "Red LSB"
