@@ -46,7 +46,7 @@ module tt_um_demoscenettsky (
 	
 	// Frame counter
 	reg [15:0] t_frame;
-	wire vsync_rising = (x == 10'd799 && y == 10'd524);
+	wire vsync_edge = (vsync_d == 1'b1 && vsync == 1'b0);
 	
 	always @(posedge clk) begin
 		if (!rst_n)
